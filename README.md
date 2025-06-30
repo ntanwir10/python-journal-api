@@ -136,25 +136,57 @@ journal-api/
 
 #### Journal Entry
 
-| Field      | Type     | Validation              |
-| ---------- | -------- | ----------------------- |
-| id         | string   | Auto-generated UUID     |
-| work       | string   | Required, max 256 chars |
-| struggle   | string   | Required, max 256 chars |
-| intention  | string   | Required, max 256 chars |
-| created_at | datetime | Auto-generated UTC      |
-| updated_at | datetime | Auto-updated UTC        |
+| Field      | Type                     | Validation                                |
+| ---------- | ------------------------ | ----------------------------------------- |
+| id         | UUID                     | Auto-generated, Primary Key, Not Null     |
+| user_id    | UUID                     | Required, Foreign Key -> user.id, Indexed |
+| work       | VARCHAR(256)             | Required, max 256 chars                   |
+| struggle   | VARCHAR(256)             | Required, max 256 chars                   |
+| intention  | VARCHAR(256)             | Required, max 256 chars                   |
+| created_at | TIMESTAMP WITH TIME ZONE | Auto-generated UTC, Not Null              |
+| updated_at | TIMESTAMP WITH TIME ZONE | Auto-updated UTC, Not Null                |
+
+SQL Definition:
+
+```sql
+CREATE TABLE journalentry (
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    work VARCHAR(256) NOT NULL,
+    struggle VARCHAR(256) NOT NULL,
+    intention VARCHAR(256) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+CREATE INDEX ix_journalentry_user_id ON journalentry (user_id);
+```
 
 #### User
 
-| Field            | Type     | Validation                    |
-| ---------------- | -------- | ----------------------------- |
-| id               | string   | Auto-generated UUID           |
-| email            | string   | Required, valid email format  |
-| password         | string   | Required, min 8 chars, hashed |
-| reset_token      | string   | Optional                      |
-| token_expires_at | datetime | Optional                      |
-| created_at       | datetime | Auto-generated UTC            |
+| Field            | Type                     | Validation                            |
+| ---------------- | ------------------------ | ------------------------------------- |
+| id               | UUID                     | Auto-generated, Primary Key, Not Null |
+| email            | VARCHAR(255)             | Required, unique, valid email format  |
+| password         | VARCHAR(255)             | Required, min 8 chars, hashed         |
+| reset_token      | VARCHAR(255)             | Optional                              |
+| token_expires_at | TIMESTAMP WITH TIME ZONE | Optional                              |
+| created_at       | TIMESTAMP WITH TIME ZONE | Auto-generated UTC, Not Null          |
+| updated_at       | TIMESTAMP WITH TIME ZONE | Auto-updated UTC, Not Null            |
+
+SQL Definition:
+
+```sql
+CREATE TABLE "user" (
+    id UUID NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    reset_token VARCHAR(255),
+    token_expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX ix_user_email ON "user" (email);
+```
 
 ### 3. Testing the API
 
