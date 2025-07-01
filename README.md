@@ -35,6 +35,12 @@ source ~/.zshrc
 createdb journal_db
 ```
 
+5. Create test database (for running tests):
+
+```bash
+createdb journal_api_test
+```
+
 ## Environment Setup
 
 1. Create a virtual environment:
@@ -56,7 +62,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Then edit `.env` with your database credentials:
+Then edit `.env` with your database credentials and other settings:
 
 ```JSON
 POSTGRES_USER=your_username
@@ -64,7 +70,15 @@ POSTGRES_PASSWORD=your_password
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=journal_db
+POSTGRES_TEST_DB=journal_api_test
 SECRET_KEY=your_secret_key
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+RESET_TOKEN_EXPIRE_MINUTES=15
+EMAIL_SENDER=your_email@example.com
+EMAIL_PASSWORD=your_email_app_password
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
 ```
 
 ## Project Structure
@@ -73,18 +87,30 @@ SECRET_KEY=your_secret_key
 journal-api/
 ├── app/                    # Application package
 │   ├── api/               # API routes and endpoints
+│   │   └── v1/           # Version 1 API endpoints
+│   │       └── auth_endpoint.py  # Authentication endpoints
 │   ├── core/              # Core functionality
-│   │   └── config.py      # Application settings and configurations
+│   │   ├── config.py      # Application settings
+│   │   └── auth_middleware.py  # JWT authentication middleware
 │   ├── db/                # Database related files
 │   │   ├── base.py        # SQLAlchemy declarative base
 │   │   └── session.py     # Database session management
 │   ├── models/            # SQLAlchemy models
-│   ├── schemas/           # Pydantic models/schemas for request/response
+│   │   ├── user_model.py  # User model
+│   │   └── journal_entry_model.py  # Journal entry model
+│   ├── schemas/           # Pydantic models/schemas
+│   │   └── auth_schema.py # Authentication schemas
 │   ├── services/          # Business logic layer
-│   └── main.py           # FastAPI application creation and configuration
-├── .env.example           # Example environment variables
-├── requirements.txt       # Project dependencies
-└── Makefile              # Development commands
+│   │   ├── auth_service.py  # Authentication service
+│   │   └── email_service.py # Email service
+│   └── main.py           # FastAPI application creation
+├── tests/                 # Test suite
+│   ├── conftest.py       # Test configuration and fixtures
+│   ├── test_auth.py      # Authentication tests
+│   └── test_models.py    # Model tests
+├── .env.example          # Example environment variables
+├── requirements.txt      # Project dependencies
+└── Makefile             # Development commands
 ```
 
 ## Technical Stack
@@ -93,7 +119,7 @@ journal-api/
 - **Database**: PostgreSQL, SQLAlchemy
 - **Security**: Python-Jose (JWT), Passlib (bcrypt)
 - **Validation**: Pydantic v2
-- **Testing**: Pytest
+- **Testing**: Pytest, httpx
 - **Development Tools**: Black (formatting), Flake8 (linting), isort (import sorting)
 
 ## Development Workflow
@@ -114,131 +140,69 @@ journal-api/
 4. Start the development server: `make dev`
 5. Run tests: `make test`
 
-## Implementation Tasks
+## Implementation Status
 
-### 1. Core API Development
+### ✅ Completed Features
 
-- [ ] POST /entries - Creates an entry
-- [ ] GET /entries - List all entries
-- [ ] GET /entries/{id} - Get a single entry
-- [ ] POST entries/\{id\} - Update an entry
-- [ ] DELETE /entries/{id} - Delete an entry
-- [ ] DELETE /entries - Delete all entries
-- [ ] POST /auth/signup - Create new user account
-- [ ] POST /auth/login - Authenticate user and get token
-- [ ] POST /auth/logout - Invalidate user token
-- [ ] POST /auth/forgot-password - Request password reset
-- [ ] POST /auth/reset-password - Reset password with token
-- [ ] Add request/response validation
-- [ ] Add error handling
+1. **Authentication System**
+   - User registration with email verification
+   - Login with JWT token generation
+   - Token refresh mechanism
+   - Password reset flow with email
+   - Secure password hashing with bcrypt
+   - Comprehensive test suite
+   - Rate limiting and security headers
 
-### 2. Data Model
+2. **Database Models**
+   - User model with UUID, email, and password
+   - Journal entry model with work, struggle, and intention fields
+   - Proper relationship setup between models
 
-#### Journal Entry
+3. **Testing Infrastructure**
+   - Test database configuration
+   - Database transaction fixtures
+   - Email service mocking
+   - Authentication test suite
 
-| Field      | Type                     | Validation                                |
-| ---------- | ------------------------ | ----------------------------------------- |
-| id         | UUID                     | Auto-generated, Primary Key, Not Null     |
-| user_id    | UUID                     | Required, Foreign Key -> user.id, Indexed |
-| work       | VARCHAR(256)             | Required, max 256 chars                   |
-| struggle   | VARCHAR(256)             | Required, max 256 chars                   |
-| intention  | VARCHAR(256)             | Required, max 256 chars                   |
-| created_at | TIMESTAMP WITH TIME ZONE | Auto-generated UTC, Not Null              |
-| updated_at | TIMESTAMP WITH TIME ZONE | Auto-updated UTC, Not Null                |
+### 🚧 In Progress
 
-SQL Definition:
+1. **Journal Entry API**
+   - CRUD operations for journal entries
+   - User-specific entry filtering
+   - Entry validation and error handling
 
-```sql
-CREATE TABLE journalentry (
-    id UUID NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-    work VARCHAR(256) NOT NULL,
-    struggle VARCHAR(256) NOT NULL,
-    intention VARCHAR(256) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
-CREATE INDEX ix_journalentry_user_id ON journalentry (user_id);
-```
+## API Documentation
 
-#### User
+Once running, API documentation is available at:
 
-| Field            | Type                     | Validation                            |
-| ---------------- | ------------------------ | ------------------------------------- |
-| id               | UUID                     | Auto-generated, Primary Key, Not Null |
-| email            | VARCHAR(255)             | Required, unique, valid email format  |
-| password         | VARCHAR(255)             | Required, min 8 chars, hashed         |
-| reset_token      | VARCHAR(255)             | Optional                              |
-| token_expires_at | TIMESTAMP WITH TIME ZONE | Optional                              |
-| created_at       | TIMESTAMP WITH TIME ZONE | Auto-generated UTC, Not Null          |
-| updated_at       | TIMESTAMP WITH TIME ZONE | Auto-updated UTC, Not Null            |
+- Swagger UI: <http://localhost:8000/docs>
+- ReDoc: <http://localhost:8000/redoc>
 
-SQL Definition:
+## API Endpoints
 
-```sql
-CREATE TABLE "user" (
-    id UUID NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    reset_token VARCHAR(255),
-    token_expires_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
-CREATE UNIQUE INDEX ix_user_email ON "user" (email);
-```
+### Authentication Endpoints
 
-### 3. Testing the API
+| Method | Endpoint                | Description                              | Status     |
+| ------ | ----------------------- | ---------------------------------------- | ---------- |
+| POST   | `/auth/signup`          | Register a new user                      | ✅ Complete |
+| POST   | `/auth/login`           | Authenticate user and get tokens         | ✅ Complete |
+| POST   | `/auth/refresh`         | Get new access token using refresh token | ✅ Complete |
+| POST   | `/auth/logout`          | Invalidate current tokens                | ✅ Complete |
+| POST   | `/auth/forgot-password` | Request password reset email             | ✅ Complete |
+| POST   | `/auth/reset-password`  | Reset password using token from email    | ✅ Complete |
 
-Test implementation using these curl commands:
+### Journal Entry Endpoints
 
-```bash
-# Create a journal entry (requires auth token)
-curl -X POST http://localhost:8000/entries \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "work": "Learned FastAPI basics",
-    "struggle": "Understanding async/await",
-    "intention": "Practice more with FastAPI"
-  }'
-```
+| Method | Endpoint        | Description                               | Status        |
+| ------ | --------------- | ----------------------------------------- | ------------- |
+| POST   | `/entries`      | Create a new journal entry                | 🚧 In Progress |
+| GET    | `/entries`      | List all entries for authenticated user   | 🚧 In Progress |
+| GET    | `/entries/{id}` | Get a specific entry by ID                | 🚧 In Progress |
+| PUT    | `/entries/{id}` | Update an existing entry                  | 🚧 In Progress |
+| DELETE | `/entries/{id}` | Delete a specific entry                   | 🚧 In Progress |
+| DELETE | `/entries`      | Delete all entries for authenticated user | 🚧 In Progress |
 
-```bash
-# Get all entries (requires auth token)
-curl -X GET http://localhost:8000/entries \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-```bash
-# Get single entry (requires auth token)
-curl -X GET http://localhost:8000/entries/{id} \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-```bash
-# Update an entry (requires auth token)
-curl -X PUT http://localhost:8000/entries/{id} \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -d '{
-    "work": "Updated work entry",
-    "struggle": "Updated struggle",
-    "intention": "Updated intention"
-  }'
-```
-
-```bash
-# Delete an entry (requires auth token)
-curl -X DELETE http://localhost:8000/entries/{id} \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-```bash
-# Delete all entries (requires auth token)
-curl -X DELETE http://localhost:8000/entries \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
+## Authentication API Examples
 
 ```bash
 # Sign-up
@@ -261,13 +225,19 @@ curl -X POST http://localhost:8000/auth/login \
 ```
 
 ```bash
+# Refresh Token
+curl -X POST http://localhost:8000/auth/refresh \
+  -H "Authorization: Bearer YOUR_REFRESH_TOKEN"
+```
+
+```bash
 # Logout (requires auth token)
 curl -X POST http://localhost:8000/auth/logout \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
 ```bash
-# Forgot Password Reset
+# Request Password Reset
 curl -X POST http://localhost:8000/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{
@@ -285,11 +255,8 @@ curl -X POST http://localhost:8000/auth/reset-password \
   }'
 ```
 
-Note: Replace `YOUR_ACCESS_TOKEN` with the actual JWT token received from the login endpoint.
+Note: Replace `YOUR_ACCESS_TOKEN` and `YOUR_REFRESH_TOKEN` with the actual JWT tokens received from the login endpoint.
 
-## API Documentation
+## Journal Entry API Examples (Coming Soon)
 
-Once running, API documentation is available at:
-
-- Swagger UI: <http://localhost:8000/docs>
-- ReDoc: <http://localhost:8000/redoc>
+The Journal Entry API endpoints are currently under development. Once completed, examples will be provided here.

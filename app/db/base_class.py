@@ -14,9 +14,3 @@ class Base(DeclarativeBase):
     def dict(self) -> dict[str, Any]:
         """Convert model instance to dictionary."""
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
-
-
-# Import all models here for Alembic
-from app.db.base_class import Base  # noqa
-from app.models.user_model import User  # noqa
-from app.models.journal_entry_model import JournalEntry  # noqa
