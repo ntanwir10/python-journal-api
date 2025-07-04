@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.api.v1.auth_endpoint import router as auth_router
+from app.api.v1.journal_entry_endpoint import router as journal_router
 from app.db.session import engine
 from app.db.base import Base
 from app.models.user_model import User
@@ -48,6 +49,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
+app.include_router(journal_router, prefix=f"{settings.API_V1_STR}", tags=["journal"])
 
 
 @app.get("/")

@@ -10,11 +10,14 @@ passlib[bcrypt]>=1.7.4
 python-dotenv>=1.0.0
 email-validator>=2.1.0.post1
 python-multipart>=0.0.6
+asyncpg>=0.29.0  # Required for async database operations
+greenlet>=3.0.0  # Required for SQLAlchemy async support
 
 # Development dependencies
 pytest>=7.4.3
 pytest-cov>=4.1.0
+pytest-asyncio>=0.23.5  # Required for async tests
 black>=23.11.0
 flake8>=6.1.0
-isort>=5.12.0
+isort>=5.12.0 
 httpx>=0.28.1  # Required for FastAPI TestClient 

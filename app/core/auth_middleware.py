@@ -2,7 +2,8 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models.user_model import User
@@ -13,7 +14,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 
 async def get_current_user(
-    db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
+    db: AsyncSession = Depends(get_db), token: str = Depends(oauth2_scheme)
 ) -> User:
     """Get current authenticated user from token."""
     credentials_exception = HTTPException(
@@ -28,7 +29,10 @@ async def get_current_user(
         raise credentials_exception
 
     # Get user from database
-    user = db.query(User).filter(User.email == token_data.email).first()
+    stmt = select(User).where(User.email == token_data.email)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
     if not user:
         raise credentials_exception
 
@@ -36,7 +40,7 @@ async def get_current_user(
 
 
 async def get_optional_user(
-    db: Session = Depends(get_db), token: Optional[str] = Depends(oauth2_scheme)
+    db: AsyncSession = Depends(get_db), token: Optional[str] = Depends(oauth2_scheme)
 ) -> Optional[User]:
     """Get current user if authenticated, otherwise return None."""
     if not token:

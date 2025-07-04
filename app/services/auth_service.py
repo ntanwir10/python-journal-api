@@ -4,7 +4,8 @@ from uuid import UUID
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.user_model import User
@@ -66,11 +67,11 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
         return None
 
 
-def authenticate_user(
-    db: Session, email: str, password: str
+async def authenticate_user(
+    db: AsyncSession, email: str, password: str
 ) -> Optional[Tuple[User, str, str]]:
     """Authenticate a user and return user object with tokens."""
-    user = get_user_by_email(db, email)
+    user = await get_user_by_email(db, email)
     if not user or not verify_password(password, user.password):
         return None
 
@@ -83,12 +84,14 @@ def authenticate_user(
     # Store refresh token in database
     user.refresh_token = refresh_token
     user.refresh_token_expires_at = expire
-    db.commit()
+    await db.commit()
 
     return user, access_token, refresh_token
 
 
-def refresh_access_token(db: Session, refresh_token: str) -> Optional[Tuple[str, str]]:
+async def refresh_access_token(
+    db: AsyncSession, refresh_token: str
+) -> Optional[Tuple[str, str]]:
     """Create new access token using refresh token."""
     # Verify refresh token
     token_data = verify_token(refresh_token, token_type="refresh")
@@ -96,7 +99,7 @@ def refresh_access_token(db: Session, refresh_token: str) -> Optional[Tuple[str,
         return None
 
     # Get user and verify refresh token matches
-    user = get_user_by_email(db, token_data.email)
+    user = await get_user_by_email(db, token_data.email)
     if not user or user.refresh_token != refresh_token:
         return None
 
@@ -107,7 +110,7 @@ def refresh_access_token(db: Session, refresh_token: str) -> Optional[Tuple[str,
     ):
         user.refresh_token = None
         user.refresh_token_expires_at = None
-        db.commit()
+        await db.commit()
         return None
 
     # Create new access token
@@ -119,34 +122,36 @@ def refresh_access_token(db: Session, refresh_token: str) -> Optional[Tuple[str,
     # Update refresh token in database
     user.refresh_token = new_refresh_token
     user.refresh_token_expires_at = expire
-    db.commit()
+    await db.commit()
 
     return access_token, new_refresh_token
 
 
-def invalidate_refresh_token(db: Session, user: User) -> None:
+async def invalidate_refresh_token(db: AsyncSession, user: User) -> None:
     """Invalidate user's refresh token."""
     user.refresh_token = None
     user.refresh_token_expires_at = None
-    db.commit()
+    await db.commit()
 
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     """Get user by email."""
-    return db.query(User).filter(User.email == email).first()
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
 
 
-def create_user(db: Session, email: str, password: str) -> User:
+async def create_user(db: AsyncSession, email: str, password: str) -> User:
     """Create a new user."""
     hashed_password = get_password_hash(password)
     user = User(email=email, password=hashed_password)
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 
-def set_password_reset_token(db: Session, user: User) -> str:
+async def set_password_reset_token(db: AsyncSession, user: User) -> str:
     """Set password reset token for user."""
     # Generate token
     token = create_access_token(
@@ -156,20 +161,18 @@ def set_password_reset_token(db: Session, user: User) -> str:
     # Update user
     user.reset_token = token
     user.reset_token_expires_at = datetime.now(UTC) + timedelta(hours=24)
-    db.commit()
+    await db.commit()
 
     return token
 
 
-def reset_password(db: Session, token: str, new_password: str) -> bool:
+async def reset_password(db: AsyncSession, token: str, new_password: str) -> bool:
     """Reset user password using reset token."""
-    user = (
-        db.query(User)
-        .filter(
-            User.reset_token == token, User.reset_token_expires_at > datetime.now(UTC)
-        )
-        .first()
+    stmt = select(User).where(
+        User.reset_token == token, User.reset_token_expires_at > datetime.now(UTC)
     )
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
 
     if not user:
         return False
@@ -178,7 +181,7 @@ def reset_password(db: Session, token: str, new_password: str) -> bool:
     user.password = get_password_hash(new_password)
     user.reset_token = None
     user.reset_token_expires_at = None
-    db.commit()
+    await db.commit()
 
     return True
 

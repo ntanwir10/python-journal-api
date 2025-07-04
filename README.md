@@ -1,5 +1,16 @@
 # Python FastAPI Journal API
 
+The Journal API is a FastAPI-based REST service that enables users to maintain personal journal entries. Built with Python 3.11+ and PostgreSQL, it features a robust authentication system with JWT tokens, email verification, and password reset functionality. The API follows modern security practices and includes comprehensive test coverage. While the authentication system is complete, the journal entry management features are currently under development. The project uses SQLAlchemy for database operations, Pydantic for data validation, and includes a full test suite with pytest.
+
+Key features:
+
+- Secure user authentication with JWT tokens
+- Email verification and password reset
+- PostgreSQL database with SQLAlchemy ORM
+- Comprehensive test coverage
+- API documentation via Swagger UI and ReDoc
+- Modern development workflow with formatting and linting tools
+
 Inspired by [Learn To Cloud](https://learntocloud.guide/)'s [Journal Starter](https://github.com/learntocloud/journal-starter) capstone project. Rather than forking the repository, this is a from-scratch implementation.
 
 ## Prerequisites
@@ -89,6 +100,7 @@ journal-api/
 │   ├── api/               # API routes and endpoints
 │   │   └── v1/           # Version 1 API endpoints
 │   │       └── auth_endpoint.py  # Authentication endpoints
+│   │   └── journal_endpoint.py  # Journal entry endpoints
 │   ├── core/              # Core functionality
 │   │   ├── config.py      # Application settings
 │   │   └── auth_middleware.py  # JWT authentication middleware
