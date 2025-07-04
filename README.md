@@ -40,16 +40,37 @@ echo 'export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-4. Create the database:
+4. Run the automated database setup script:
+
+```bash
+./scripts/setup_db.sh
+```
+
+This script will:
+
+- Create the main database (journal_db)
+- Create the test database (journal_api_test)
+- Set up necessary extensions
+- Apply all database migrations
+
+Alternatively, you can set up the databases manually:
+
+5. Create the database:
 
 ```bash
 createdb journal_db
 ```
 
-5. Create test database (for running tests):
+6. Create test database (for running tests):
 
 ```bash
 createdb journal_api_test
+```
+
+7. Apply database migrations:
+
+```bash
+alembic upgrade head
 ```
 
 ## Environment Setup
@@ -128,7 +149,7 @@ journal-api/
 ## Technical Stack
 
 - **Core Framework**: Python 3.11+, FastAPI, Uvicorn
-- **Database**: PostgreSQL, SQLAlchemy
+- **Database**: PostgreSQL, SQLAlchemy, Alembic (migrations)
 - **Security**: Python-Jose (JWT), Passlib (bcrypt)
 - **Validation**: Pydantic v2
 - **Testing**: Pytest, httpx
@@ -141,8 +162,10 @@ journal-api/
 3. Run tests (`make test`)
 4. Format code (`make format`)
 5. Run linting (`make lint`)
-6. Commit changes
-7. Create pull request
+6. Create database migration if needed (`alembic revision --autogenerate -m "description"`)
+7. Apply migrations (`alembic upgrade head`)
+8. Commit changes
+9. Create pull request
 
 ## Getting Started
 
@@ -165,7 +188,9 @@ journal-api/
    - Comprehensive test suite
    - Rate limiting and security headers
 
-2. **Database Models**
+2. **Database Infrastructure**
+   - Automated database setup script
+   - Database migrations with Alembic
    - User model with UUID, email, and password
    - Journal entry model with work, struggle, and intention fields
    - Proper relationship setup between models
@@ -272,3 +297,33 @@ Note: Replace `YOUR_ACCESS_TOKEN` and `YOUR_REFRESH_TOKEN` with the actual JWT t
 ## Journal Entry API Examples (Coming Soon)
 
 The Journal Entry API endpoints are currently under development. Once completed, examples will be provided here.
+
+## Database Migrations
+
+The project uses Alembic for database migrations. Here are common migration commands:
+
+```bash
+# Create a new migration
+alembic revision --autogenerate -m "description of changes"
+
+# Apply all pending migrations
+alembic upgrade head
+
+# Rollback last migration
+alembic downgrade -1
+
+# View migration history
+alembic history
+
+# View current migration status
+alembic current
+```
+
+All migrations are stored in the `migrations/versions/` directory and are version controlled. This ensures consistent database schema across all environments.
+
+The initial migration includes:
+
+- User table with UUID, email, and password fields
+- Journal entry table with work, struggle, and intention fields
+- Proper indexes and foreign key relationships
+- Timestamp fields for auditing
