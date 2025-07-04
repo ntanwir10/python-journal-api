@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format clean setup
+.PHONY: help install dev test lint format clean setup db-setup db-migrate db-upgrade db-downgrade
 
 help: ## Show this help menu
 	@echo 'Available commands:'
@@ -27,4 +27,17 @@ format: ## Format code
 
 clean: ## Remove cache files
 	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete 
+	find . -type f -name "*.pyc" -delete
+
+db-setup: ## Setup databases and extensions
+	chmod +x scripts/setup_db.sh
+	./scripts/setup_db.sh
+
+db-migrate: ## Create a new database migration
+	alembic revision --autogenerate -m "$(message)"
+
+db-upgrade: ## Apply all pending migrations
+	alembic upgrade head
+
+db-downgrade: ## Rollback the last migration
+	alembic downgrade -1 
