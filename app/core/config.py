@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # Frontend URL for password reset
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # Rate limiting settings
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_REQUESTS_PER_MINUTE: int = 60
+    RATE_LIMIT_AUTH_REQUESTS_PER_MINUTE: int = 10  # Stricter for auth endpoints
+    RATE_LIMIT_BURST_SIZE: int = 10  # Allow burst of requests
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
 

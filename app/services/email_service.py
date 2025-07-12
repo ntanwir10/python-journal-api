@@ -1,7 +1,7 @@
-from typing import Optional
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Optional
 
 from app.core.config import settings
 

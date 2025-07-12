@@ -1,0 +1,45 @@
+2025-07-12T15:28:05.087122 - Attempting to connect to database: postgresql://ntanwir:journal_pass_123@localhost:5432/journal_db
+2025-07-12T15:28:05.090364 - Failed to connect to database: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+2025-07-12T15:28:28.808697 - Attempting to connect to database: postgresql://ntanwir:journal_pass_123@localhost:5432/journal_db
+2025-07-12T15:28:28.857920 - Successfully connected to database!
+2025-07-12T15:28:28.857978 - Creating database tables...
+2025-07-12T15:28:32.147625 - Starting user creation test...
+2025-07-12T15:28:32.147722 - Created user object: test@example.com
+2025-07-12T15:28:32.150743 - ✅ User creation test passed!
+2025-07-12T15:29:46.644085 - Attempting to connect to database: postgresql://ntanwir:journal_pass_123@localhost:5432/journal_db
+2025-07-12T15:29:46.669430 - Successfully connected to database!
+2025-07-12T15:29:46.669486 - Creating database tables...
+2025-07-12T15:29:46.686896 - Starting user creation test...
+2025-07-12T15:29:46.688330 - Created user object: test@example.com
+2025-07-12T15:29:46.693342 - ✅ User creation test passed!
+2025-07-12T16:06:47.332939 - Attempting to connect to database: postgresql://ntanwir:journal_pass_123@localhost:5432/journal_db
+2025-07-12T16:06:47.352940 - Successfully connected to database!
+2025-07-12T16:06:47.353008 - Creating database tables...
+2025-07-12T16:06:47.374599 - Starting user creation test...
+2025-07-12T16:06:47.376126 - Created user object: test@example.com
+2025-07-12T16:06:47.381046 - ✅ User creation test passed!
+2025-07-12T16:06:47.381695 - Starting journal entry creation test...
+2025-07-12T16:06:47.383447 - ❌ Journal entry creation test failed: name 'user' is not defined
+2025-07-12T16:14:32.212903 - Attempting to connect to database: postgresql://ntanwir:journal_pass_123@localhost:5432/journal_db
+2025-07-12T16:14:32.232525 - Successfully connected to database!
+2025-07-12T16:14:32.232610 - Creating database tables...
+2025-07-12T16:14:35.997713 - Starting user creation test...
+2025-07-12T16:14:35.997818 - Created user object: test@example.com
+2025-07-12T16:14:36.000170 - ❌ User creation test failed: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "ix_user_email"
+DETAIL:  Key (email)=(test@example.com) already exists.
+
+[SQL: INSERT INTO "user" (id, email, password, reset_token, reset_token_expires_at, refresh_token, refresh_token_expires_at) VALUES (%(id)s::UUID, %(email)s, %(password)s, %(reset_token)s, %(reset_token_expires_at)s, %(refresh_token)s, %(refresh_token_expires_at)s) RETURNING "user".created_at, "user".updated_at]
+[parameters: {'id': UUID('0bae0be7-18f7-4d17-b450-4951574567ad'), 'email': 'test@example.com', 'password': 'hashed_password', 'reset_token': None, 'reset_token_expires_at': None, 'refresh_token': None, 'refresh_token_expires_at': None}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-07-12T16:14:36.124812 - Starting journal entry creation test...
+2025-07-12T16:14:36.126852 - ❌ Journal entry creation test failed: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "ix_user_email"
+DETAIL:  Key (email)=(journal_test@example.com) already exists.
+
+[SQL: INSERT INTO "user" (id, email, password, reset_token, reset_token_expires_at, refresh_token, refresh_token_expires_at) VALUES (%(id)s::UUID, %(email)s, %(password)s, %(reset_token)s, %(reset_token_expires_at)s, %(refresh_token)s, %(refresh_token_expires_at)s) RETURNING "user".created_at, "user".updated_at]
+[parameters: {'id': UUID('c1c4d766-34ec-4c79-bf96-7a550fdc1255'), 'email': 'journal_test@example.com', 'password': 'hashed_password', 'reset_token': None, 'reset_token_expires_at': None, 'refresh_token': None, 'refresh_token_expires_at': None}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)

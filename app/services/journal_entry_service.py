@@ -5,7 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.journal_entry_model import JournalEntry
-from app.schemas.journal_entry_schema import JournalEntryCreate, JournalEntryUpdate
+from app.schemas.journal_entry_schema import (JournalEntryCreate,
+                                              JournalEntryUpdate)
 
 
 class JournalEntryService:

@@ -1,15 +1,21 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.config import settings
 from app.api.v1.auth_endpoint import router as auth_router
 from app.api.v1.journal_entry_endpoint import router as journal_router
-from app.db.session import engine
+from app.core.config import settings
+from app.core.rate_limiter import (general_rate_limit, limiter,
+                                   rate_limit_handler)
 from app.db.base import Base
-from app.models.user_model import User
+from app.db.session import engine
 from app.models.journal_entry_model import JournalEntry
+from app.models.user_model import User
 
 
 # Create database tables
@@ -38,6 +44,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Add rate limiting middleware
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 # CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
@@ -53,6 +64,7 @@ app.include_router(journal_router, prefix=f"{settings.API_V1_STR}", tags=["journ
 
 
 @app.get("/")
-async def root():
+@general_rate_limit()
+async def root(request: Request):
     """Root endpoint to verify API is running"""
     return {"message": "Welcome to Journal API", "status": "active"}

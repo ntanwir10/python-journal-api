@@ -4,9 +4,9 @@ from typing import AsyncGenerator, Dict
 import pytest
 from fastapi import status
 from httpx import AsyncClient
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import delete, select
 
 from app.core.config import settings
 from app.models.journal_entry_model import JournalEntry

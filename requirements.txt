@@ -13,6 +13,7 @@ python-multipart>=0.0.6
 asyncpg>=0.29.0  # Required for async database operations
 greenlet>=3.0.0  # Required for SQLAlchemy async support
 alembic>=1.13.0  # Required for database migrations
+slowapi>=0.1.9  # Rate limiting for FastAPI
 
 # Development dependencies
 pytest>=7.4.3

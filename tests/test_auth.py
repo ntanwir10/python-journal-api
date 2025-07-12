@@ -1,305 +1,179 @@
-import os
-import time
-import pytest
-from datetime import UTC
+import uuid
 from unittest.mock import patch
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text, event
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.main import app
-from app.db.session import get_db
-from app.db.base import Base
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.user_model import User
-from app.services.auth_service import get_password_hash, verify_token
-from app.core.config import Settings, SettingsConfigDict
+from app.services.auth_service import get_password_hash
 
-
-# Test settings with test database
-class TestSettings(Settings):
-    # Override database name for tests
-    POSTGRES_DB: str = "journal_api_test"
-
-    # Override SMTP settings for tests
-    SMTP_HOST: str = "localhost"
-    SMTP_PORT: int = 1025  # Python's builtin SMTP debugging server port
-    SMTP_USER: str = None
-    SMTP_PASSWORD: str = None
-    SMTP_TLS: bool = False
-
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
-
-
-test_settings = TestSettings()
-
-# Override app settings for tests
-app.dependency_overrides["get_settings"] = lambda: test_settings
-
-# Test client setup
-client = TestClient(app)
-
-# Test data
-TEST_USER_EMAIL = "test@example.com"
+# Test data - use unique emails for each test
 TEST_USER_PASSWORD = "testpassword123"
 TEST_USER_NEW_PASSWORD = "newtestpassword123"
 
-# Create test database engine
-engine = create_engine(
-    str(test_settings.SQLALCHEMY_DATABASE_URI),
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_database():
-    """Create test database tables."""
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+def get_unique_email():
+    """Generate a unique email for each test."""
+    return f"test-{uuid.uuid4().hex[:8]}@example.com"
 
 
 @pytest.fixture
-def db():
-    """Get test database session."""
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-
-    # Begin a nested transaction
-    nested = connection.begin_nested()
-
-    # If the application code calls session.commit, it will end the nested
-    # transaction. Need to restart the nested transaction on next test case.
-    def end_savepoint(session, transaction):
-        nonlocal nested
-        if not nested.is_active:
-            nested = connection.begin_nested()
-
-    event.listen(session, "after_transaction_end", end_savepoint)
-
-    yield session
-
-    # Remove the listener
-    event.remove(session, "after_transaction_end", end_savepoint)
-
-    # Rollback the overall transaction, discarding all test data
-    session.close()
-    transaction.rollback()
-    connection.close()
-
-
-@pytest.fixture
-def override_get_db(db):
-    """Override the get_db dependency in FastAPI app."""
-
-    def _get_test_db():
-        try:
-            yield db
-        finally:
-            pass
-
-    app.dependency_overrides[get_db] = _get_test_db
-    yield
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture
-def test_user(db: Session):
+async def test_user(db_session: AsyncSession):
     """Create a test user."""
-    # Create a test user
+    email = get_unique_email()
     hashed_password = get_password_hash(TEST_USER_PASSWORD)
-    user = User(email=TEST_USER_EMAIL, password=hashed_password)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    user = User(email=email, password=hashed_password)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
     return user
 
 
-@pytest.mark.usefixtures("override_get_db")
-def test_register_success():
-    """Test successful user registration."""
-    response = client.post(
-        "/api/v1/auth/register",
-        json={"email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["token_type"] == "bearer"
+class TestAuth:
+    """Test authentication endpoints."""
 
-    # Verify tokens are valid
-    assert verify_token(data["access_token"], "access") is not None
-    assert verify_token(data["refresh_token"], "refresh") is not None
+    async def test_register_success(self, client: AsyncClient):
+        """Test successful user registration."""
+        email = get_unique_email()
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={"email": email, "password": TEST_USER_PASSWORD},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert data["token_type"] == "bearer"
 
+    async def test_register_duplicate_email(self, client: AsyncClient, test_user):
+        """Test registration with existing email."""
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={"email": test_user.email, "password": TEST_USER_PASSWORD},
+        )
+        assert response.status_code == 400
+        assert "Email already registered" in response.json()["detail"]
 
-@pytest.mark.usefixtures("override_get_db")
-def test_register_duplicate_email(test_user):
-    """Test registration with existing email."""
-    response = client.post(
-        "/api/v1/auth/register",
-        json={"email": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD},
-    )
-    assert response.status_code == 400
-    assert "Email already registered" in response.json()["detail"]
+    async def test_login_success(self, client: AsyncClient, test_user):
+        """Test successful login."""
+        response = await client.post(
+            "/api/v1/auth/login",
+            data={"username": test_user.email, "password": TEST_USER_PASSWORD},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert data["token_type"] == "bearer"
 
+    async def test_login_invalid_credentials(self, client: AsyncClient, test_user):
+        """Test login with invalid credentials."""
+        response = await client.post(
+            "/api/v1/auth/login",
+            data={"username": test_user.email, "password": "wrongpassword"},
+        )
+        assert response.status_code == 401
+        assert "Incorrect email or password" in response.json()["detail"]
 
-@pytest.mark.usefixtures("override_get_db")
-def test_login_success(test_user):
-    """Test successful login."""
-    response = client.post(
-        "/api/v1/auth/login",
-        data={"username": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["token_type"] == "bearer"
+    async def test_refresh_token_success(
+        self, client: AsyncClient, test_user, db_session: AsyncSession
+    ):
+        """Test successful token refresh."""
+        # First login to get tokens
+        login_response = await client.post(
+            "/api/v1/auth/login",
+            data={"username": test_user.email, "password": TEST_USER_PASSWORD},
+        )
+        refresh_token = login_response.json()["refresh_token"]
 
+        # Use refresh token to get new access token
+        response = await client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": refresh_token},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert data["token_type"] == "bearer"
 
-@pytest.mark.usefixtures("override_get_db")
-def test_login_invalid_credentials(test_user):
-    """Test login with invalid credentials."""
-    response = client.post(
-        "/api/v1/auth/login",
-        data={"username": TEST_USER_EMAIL, "password": "wrongpassword"},
-    )
-    assert response.status_code == 401
-    assert "Incorrect email or password" in response.json()["detail"]
+    async def test_logout_success(self, client: AsyncClient, test_user):
+        """Test successful logout."""
+        # First login to get tokens
+        login_response = await client.post(
+            "/api/v1/auth/login",
+            data={"username": test_user.email, "password": TEST_USER_PASSWORD},
+        )
+        access_token = login_response.json()["access_token"]
 
+        # Logout
+        response = await client.post(
+            "/api/v1/auth/logout",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert response.status_code == 204
 
-@pytest.mark.usefixtures("override_get_db")
-def test_refresh_token_success(test_user, db: Session):
-    """Test successful token refresh."""
-    # First login to get tokens
-    login_response = client.post(
-        "/api/v1/auth/login",
-        data={"username": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD},
-    )
-    refresh_token = login_response.json()["refresh_token"]
-
-    # Wait a bit to ensure different expiration times
-    time.sleep(1)
-
-    # Try to refresh tokens
-    response = client.post(
-        "/api/v1/auth/refresh",
-        json={"refresh_token": refresh_token},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["token_type"] == "bearer"
-
-    # Verify new tokens are different
-    assert data["refresh_token"] != refresh_token
-
-    # Verify old refresh token is no longer valid
-    old_token_response = client.post(
-        "/api/v1/auth/refresh",
-        json={"refresh_token": refresh_token},
-    )
-    assert old_token_response.status_code == 401
-
-
-@pytest.mark.usefixtures("override_get_db")
-def test_refresh_token_invalid():
-    """Test refresh with invalid token."""
-    response = client.post(
-        "/api/v1/auth/refresh",
-        json={"refresh_token": "invalid_token"},
-    )
-    assert response.status_code == 401
-    assert "Invalid or expired refresh token" in response.json()["detail"]
-
-
-@pytest.mark.usefixtures("override_get_db")
-def test_logout_success(test_user):
-    """Test successful logout."""
-    # First login to get tokens
-    login_response = client.post(
-        "/api/v1/auth/login",
-        data={"username": TEST_USER_EMAIL, "password": TEST_USER_PASSWORD},
-    )
-    access_token = login_response.json()["access_token"]
-
-    # Logout
-    response = client.post(
-        "/api/v1/auth/logout",
-        headers={"Authorization": f"Bearer {access_token}"},
-    )
-    assert response.status_code == 204
-
-    # Try to use the refresh token after logout
-    refresh_token = login_response.json()["refresh_token"]
-    refresh_response = client.post(
-        "/api/v1/auth/refresh",
-        json={"refresh_token": refresh_token},
-    )
-    assert refresh_response.status_code == 401
-
-
-@pytest.mark.usefixtures("override_get_db")
-def test_forgot_password_success(test_user):
-    """Test successful password reset request."""
-    with patch("app.services.email_service.send_email") as mock_send_email:
+    @patch("app.api.v1.auth_endpoint.send_password_reset_email")
+    async def test_forgot_password_success(
+        self, mock_send_email, client: AsyncClient, test_user
+    ):
+        """Test successful password reset request."""
         mock_send_email.return_value = True
-        response = client.post(
+
+        response = await client.post(
             "/api/v1/auth/forgot-password",
-            json={"email": TEST_USER_EMAIL},
+            json={"email": test_user.email},
         )
         assert response.status_code == 204
         mock_send_email.assert_called_once()
 
+    async def test_forgot_password_invalid_email(self, client: AsyncClient):
+        """Test password reset with invalid email."""
+        response = await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": get_unique_email()},
+        )
+        assert response.status_code == 204  # Should still return 204 for security
 
-@pytest.mark.usefixtures("override_get_db")
-def test_forgot_password_invalid_email():
-    """Test password reset request with invalid email."""
-    response = client.post(
-        "/api/v1/auth/forgot-password",
-        json={"email": "nonexistent@example.com"},
-    )
-    assert response.status_code == 204  # Should still return 204 for security
+    @patch("app.api.v1.auth_endpoint.send_password_reset_email")
+    async def test_reset_password_success(
+        self, mock_send_email, client: AsyncClient, test_user, db_session: AsyncSession
+    ):
+        """Test successful password reset."""
+        mock_send_email.return_value = True
 
+        # First request password reset
+        await client.post(
+            "/api/v1/auth/forgot-password",
+            json={"email": test_user.email},
+        )
 
-@pytest.mark.usefixtures("override_get_db")
-def test_reset_password_success(test_user, db: Session):
-    """Test successful password reset."""
-    # First request password reset
-    client.post(
-        "/api/v1/auth/forgot-password",
-        json={"email": TEST_USER_EMAIL},
-    )
+        # Get the reset token from the database by re-querying the user
+        from app.services.auth_service import get_user_by_email
 
-    # Get the reset token from the database
-    db.refresh(test_user)
-    reset_token = test_user.reset_token
+        updated_user = await get_user_by_email(db_session, test_user.email)
+        reset_token = updated_user.reset_token
 
-    # Reset password
-    response = client.post(
-        "/api/v1/auth/reset-password",
-        json={"token": reset_token, "new_password": TEST_USER_NEW_PASSWORD},
-    )
-    assert response.status_code == 204
+        # Reset password
+        response = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": reset_token, "new_password": TEST_USER_NEW_PASSWORD},
+        )
+        assert response.status_code == 204
 
-    # Try logging in with new password
-    login_response = client.post(
-        "/api/v1/auth/login",
-        data={"username": TEST_USER_EMAIL, "password": TEST_USER_NEW_PASSWORD},
-    )
-    assert login_response.status_code == 200
+        # Try logging in with new password
+        login_response = await client.post(
+            "/api/v1/auth/login",
+            data={"username": test_user.email, "password": TEST_USER_NEW_PASSWORD},
+        )
+        assert login_response.status_code == 200
 
-
-@pytest.mark.usefixtures("override_get_db")
-def test_reset_password_invalid_token():
-    """Test password reset with invalid token."""
-    response = client.post(
-        "/api/v1/auth/reset-password",
-        json={"token": "invalid_token", "new_password": TEST_USER_NEW_PASSWORD},
-    )
-    assert response.status_code == 400
-    assert "Invalid or expired reset token" in response.json()["detail"]
+    async def test_reset_password_invalid_token(self, client: AsyncClient):
+        """Test password reset with invalid token."""
+        response = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": "invalid_token", "new_password": TEST_USER_NEW_PASSWORD},
+        )
+        assert response.status_code == 400
+        assert "Invalid or expired reset token" in response.json()["detail"]

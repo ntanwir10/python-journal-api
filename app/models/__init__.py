@@ -1,9 +1,10 @@
 from typing import List
-from sqlalchemy.orm import relationship, Mapped
 
+from sqlalchemy.orm import Mapped, relationship
+
+from app.models.journal_entry_model import JournalEntry
 # Import the models
 from app.models.user_model import User
-from app.models.journal_entry_model import JournalEntry
 
 # Add relationships without type annotations
 User.entries = relationship(

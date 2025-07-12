@@ -1,17 +1,16 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_middleware import get_current_user
+from app.core.rate_limiter import general_rate_limit
 from app.db.session import get_db
 from app.models.user_model import User
-from app.schemas.journal_entry_schema import (
-    JournalEntryCreate,
-    JournalEntryResponse,
-    JournalEntryUpdate,
-)
+from app.schemas.journal_entry_schema import (JournalEntryCreate,
+                                              JournalEntryResponse,
+                                              JournalEntryUpdate)
 from app.services.journal_entry_service import JournalEntryService
 
 router = APIRouter(prefix="/entries", tags=["journal entries"])
@@ -22,7 +21,9 @@ router = APIRouter(prefix="/entries", tags=["journal entries"])
     response_model=JournalEntryResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@general_rate_limit()
 async def create_entry(
+    request: Request,
     entry: JournalEntryCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -33,7 +34,9 @@ async def create_entry(
 
 
 @router.get("", response_model=List[JournalEntryResponse])
+@general_rate_limit()
 async def get_entries(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -43,7 +46,9 @@ async def get_entries(
 
 
 @router.get("/{entry_id}", response_model=JournalEntryResponse)
+@general_rate_limit()
 async def get_entry(
+    request: Request,
     entry_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -60,7 +65,9 @@ async def get_entry(
 
 
 @router.put("/{entry_id}", response_model=JournalEntryResponse)
+@general_rate_limit()
 async def update_entry(
+    request: Request,
     entry_id: UUID,
     entry_update: JournalEntryUpdate,
     current_user: User = Depends(get_current_user),
@@ -78,7 +85,9 @@ async def update_entry(
 
 
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+@general_rate_limit()
 async def delete_entry(
+    request: Request,
     entry_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -94,7 +103,9 @@ async def delete_entry(
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
+@general_rate_limit()
 async def delete_all_entries(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

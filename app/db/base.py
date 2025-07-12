@@ -1,4 +1,5 @@
 from typing import Any
+
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import DeclarativeBase
 
@@ -18,5 +19,5 @@ class Base(DeclarativeBase):
 
 # Import all models here for Alembic
 from app.db.base_class import Base  # noqa
-from app.models.user_model import User  # noqa
 from app.models.journal_entry_model import JournalEntry  # noqa
+from app.models.user_model import User  # noqa
